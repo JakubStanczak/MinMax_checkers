@@ -13,31 +13,37 @@ class Square:
     def __init__(self, x, y, black):
         self.x = x
         self.y = y
-        self.sq_black = black
+        self.black = black
         self.selected = False
+        self.highlighted = False
         self.piece = None
 
     def draw(self):
-        color_sq = (96, 96, 96) if self.sq_black else (255, 255, 255)
-        color = (0, 100, 0) if self.selected else color_sq
+        if self.selected:
+            color = (0, 100, 0)
+        elif self.highlighted:
+            color = (0, 200, 0)
+        elif self.black:
+            color = (96, 96, 96)
+        else:
+            color = (255, 255, 255)
         pygame.draw.rect(win, color, (self.x * self.dim, self.y * self.dim + offset, self.dim , self.dim))
+        if self.piece is not None:
+            self.piece.draw(self.x, self.y)
 
     def __repr__(self):
         return "{} {} {}".format(self.x, self.y, self.piece)
 
-
 class Piece:
     rad = 20
 
-    def __init__(self, x, y, black):
-        self.x = x
-        self.y = y
+    def __init__(self, black):
         self.black = black
         self.queen = False
 
-    def draw(self):
+    def draw(self, x, y):
         color = (0, 0, 0) if self.black else (224, 224, 224)
-        pygame.draw.circle(win, color, (self.x * Square.dim + Square.dim // 2, self.y * Square.dim + Square.dim // 2 + offset), self.rad)
+        pygame.draw.circle(win, color, (x * Square.dim + Square.dim // 2, y * Square.dim + Square.dim // 2 + offset), self.rad)
 
     def __repr__(self):
         if self.black:
@@ -62,19 +68,18 @@ def init():
             column.append(Square(x, y, True if (x + y) % 2 == 1 else False))
         board.append(column)
 
-    # for x in range(8):
-    #     for y in range(3):
-    #         board[x][y].piece = Piece(x, y, False)
-    #     for y in range(5, 8):
-    #         board[x][y].piece = Piece(x, y, True)
+    for x in range(8):
+        for y in range(3):
+            board[x][y].piece = Piece(False)
+        for y in range(5, 8):
+            board[x][y].piece = Piece(True)
 
 
 def draw():
     win.fill((255, 255, 255))
     for sq in chain.from_iterable(board):
         sq.draw()
-        if sq.piece is not None:
-            sq.piece.draw()
+
     pygame.display.update()
 
 def select_sq(x, y):
@@ -94,24 +99,43 @@ def select_sq(x, y):
     for sq in chain.from_iterable(board):
         if sq.selected:
             num_selected += 1
-            start_pos = sq
+            if sq.piece is not None:
+                start_pos = sq
     if num_selected == 0 and board[x][y].piece is not None:
         board[x][y].selected = True
+        select_legal_moves(board[x][y])
         return
     else:
         for sq in chain.from_iterable(board):
             sq.selected = False
-        move_piece(start_pos, board[x][y])
+            sq.highlighted = False
+        if start_pos is not None:
+            move_piece(start_pos, board[x][y],)
 
+def select_legal_moves(start_pos):
+    for sq in chain.from_iterable(board):
+        if if_move_legal(start_pos, sq):
+            sq.highlighted = True
 
 def move_piece(start_pos, end_pos):
     print(start_pos)
     print(end_pos)
     #  check if move is legal
-    end_pos.piece = start_pos.piece
-    start_pos.piece = None
+    if if_move_legal(start_pos, end_pos):
+        end_pos.piece = start_pos.piece
+        start_pos.piece = None
+
+def capture_piece():
+    pass
 
 
+legal_dir = {True: 1, False: -1}
+def if_move_legal(start_pos, end_pos):
+    if end_pos.piece is None:
+        if start_pos.y - end_pos.y == legal_dir[start_pos.piece.black] and abs(end_pos.x - start_pos.x) == 1:
+            return True
+    else:
+        pass
 
 init()
 run = True
