@@ -149,6 +149,7 @@ def highlight_legal_moves(start_pos):
         if if_move_legal(start_pos, sq)[0]:
             sq.highlighted = True
 
+
 def return_legal_moves(start_pos):
     legal_moves = []
     for sq in chain.from_iterable(board):
@@ -156,13 +157,15 @@ def return_legal_moves(start_pos):
             legal_moves.append(sq)
     return legal_moves
 
+
 def check_if_must_capture():
     for sq_s in chain.from_iterable(board):
         if sq_s.piece is not None:
-            sq_s.piece.must_capture = False
-            for sq_e in chain.from_iterable(board):
-                if if_move_legal(sq_s, sq_e)[1]:
-                    sq_s.piece.must_capture = True
+            if sq_s.piece.black == black_turn:
+                sq_s.piece.must_capture = False
+                for sq_e in chain.from_iterable(board):
+                    if if_move_legal(sq_s, sq_e)[1]:
+                        sq_s.piece.must_capture = True
 
 
 def check_if_king():
@@ -173,6 +176,7 @@ def check_if_king():
         if board[x][board_height - 1].piece is not None:
             if not board[x][board_height - 1].piece.black:
                 board[x][board_height - 1].piece.king = True
+
 
 def check_if_end():
     white_count = 0
@@ -189,7 +193,6 @@ def check_if_end():
         winner = "Black"
     if black_count == 0:
         winner = "White"
-
 
 
 def move_piece(start_pos, end_pos):
@@ -219,8 +222,6 @@ def next_turn(end_pos, capture):
         check_if_must_capture()
         if not end_pos.piece.must_capture:
             black_turn = not black_turn
-
-
 
 
 legal_dir = {True: 1, False: -1}
