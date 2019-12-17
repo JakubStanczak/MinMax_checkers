@@ -36,13 +36,13 @@ class Square:
     def __repr__(self):
         return "{} {} {}".format(self.x, self.y, self.piece)
 
+
 class Piece:
     rad = 20
 
     def __init__(self, black):
         self.black = black
         self.must_capture = False
-        self.streak = False
         self.king = False
 
     def draw(self, x, y):
@@ -89,24 +89,21 @@ def draw():
     for sq in chain.from_iterable(board):
         sq.draw()
 
-    if winner is None:
+    if black_won is None:
         if black_turn:
             text = "it's blacks turn"
         else:
             text = "it's whites turn"
     else:
-        text = "{}'s the winner".format(winner)
+        text = "{}'s the winner".format(black_won)
     rendered_text = standard_font.render(text, True, (0, 0, 0))
     win.blit(rendered_text, (20, 5))
     pygame.display.update()
 
 
 def select_sq(x, y, turn):
-    must_capture = False
-    for sq in chain.from_iterable(board):
-        if sq.piece is not None:
-            if sq.piece.must_capture and sq.piece.black == turn:
-                must_capture = True
+    n_turn = False
+    must_capture = check_if_must_capture(board)
     print("turn: {} must capture:{}".format(turn, must_capture))
     if y < offset:
         return
@@ -135,7 +132,11 @@ def select_sq(x, y, turn):
     else:
         clean_sel_high()
         if start_pos is not None:
-            move_piece(start_pos, board[x][y],)
+            n_turn = move_piece(board, start_pos, board[x][y])
+
+    global black_turn
+    if n_turn:
+        black_turn = not black_turn
 
 
 def clean_sel_high():
@@ -146,87 +147,94 @@ def clean_sel_high():
 
 def highlight_legal_moves(start_pos):
     for sq in chain.from_iterable(board):
-        if if_move_legal(start_pos, sq)[0]:
+        if if_move_legal(board, start_pos, sq)[0]:
             sq.highlighted = True
 
 
-def return_legal_moves(start_pos):
+def highlight_must_capture(current_board):
+    for sq_s in chain.from_iterable(current_board):
+        if sq_s.piece is not None:
+            sq_s.piece.must_capture = False
+            for sq_e in chain.from_iterable(current_board):
+                if if_move_legal(current_board, sq_s, sq_e)[1]:
+                    sq_s.piece.must_capture = True
+
+
+def return_legal_moves(current_board, start_pos):
     legal_moves = []
-    for sq in chain.from_iterable(board):
-        if if_move_legal(start_pos, sq)[0]:
+    for sq in chain.from_iterable(current_board):
+        if if_move_legal(current_board, start_pos, sq)[0]:
             legal_moves.append(sq)
     return legal_moves
 
 
-def check_if_must_capture():
-    for sq_s in chain.from_iterable(board):
-        if sq_s.piece is not None:
-            if sq_s.piece.black == black_turn:
-                sq_s.piece.must_capture = False
-                for sq_e in chain.from_iterable(board):
-                    if if_move_legal(sq_s, sq_e)[1]:
-                        sq_s.piece.must_capture = True
-
-
-def check_if_king():
+def check_if_king(current_board):
     for x in range(board_width):
-        if board[x][0].piece is not None:
-            if board[x][0].piece.black:
-                board[x][0].piece.king = True
-        if board[x][board_height - 1].piece is not None:
-            if not board[x][board_height - 1].piece.black:
-                board[x][board_height - 1].piece.king = True
+        if current_board[x][0].piece is not None:
+            if current_board[x][0].piece.black:
+                current_board[x][0].piece.king = True
+        if current_board[x][board_height - 1].piece is not None:
+            if not current_board[x][board_height - 1].piece.black:
+                current_board[x][board_height - 1].piece.king = True
 
 
-def check_if_end():
+def check_if_end(current_board):
     white_count = 0
     black_count = 0
-    for sq in chain.from_iterable(board):
+    for sq in chain.from_iterable(current_board):
         if sq.piece is not None:
-            if len(return_legal_moves(sq)) > 0:
+            if len(return_legal_moves(current_board, sq)) > 0:
                 if sq.piece.black:
                     black_count += 1
                 if not sq.piece.black:
                     white_count += 1
-    global winner
     if white_count == 0:
-        winner = "Black"
+        return True
     if black_count == 0:
-        winner = "White"
+        return False
 
+def check_if_must_capture(current_board):
+    must_capture = False
+    for sq in chain.from_iterable(current_board):
+        if sq.piece is not None:
+            if sq.piece.must_capture:
+                must_capture = True
+    return must_capture
 
-def move_piece(start_pos, end_pos):
-    print(start_pos)
-    print(end_pos)
-    if_legal, if_capture = if_move_legal(start_pos, end_pos)
+def move_piece(current_board, start_pos, end_pos):
+    # print(start_pos)
+    # print(end_pos)
+
+    if_legal, if_capture = if_move_legal(current_board, start_pos, end_pos)
     if not if_legal:
         return
     if not if_capture:
         print("move")
         end_pos.piece = start_pos.piece
         start_pos.piece = None
-        next_turn(end_pos, False)
+        n_turn = next_turn(current_board, end_pos, False)
     if if_capture:
         print("capture")
         end_pos.piece = start_pos.piece
         start_pos.piece = None
-        board[(start_pos.x + end_pos.x) // 2][(start_pos.y + end_pos.y) // 2].piece = None
-        next_turn(end_pos, True)
+        current_board[(start_pos.x + end_pos.x) // 2][(start_pos.y + end_pos.y) // 2].piece = None
+        n_turn = next_turn(current_board, end_pos, True)
+    return n_turn
 
 
-def next_turn(end_pos, capture):
-    global black_turn
+def next_turn(current_board, end_pos, capture):
+    n_turn = False
     if not capture:
-        black_turn = not black_turn
+        n_turn = True
     if capture:
-        check_if_must_capture()
+        highlight_must_capture(current_board)
         if not end_pos.piece.must_capture:
-            black_turn = not black_turn
-
+            n_turn = True
+    return n_turn
 
 legal_dir = {True: 1, False: -1}
-def if_move_legal(start_pos, end_pos):  # returns ifLegal, ifCapture
-    if end_pos.piece is None:
+def if_move_legal(current_board, start_pos, end_pos):  # returns ifLegal, ifCapture
+    if end_pos.piece is None and start_pos.piece is not None:
         # move
         if not start_pos.piece.must_capture:
             if not start_pos.piece.king:
@@ -237,28 +245,85 @@ def if_move_legal(start_pos, end_pos):  # returns ifLegal, ifCapture
                     return True, False
         # capture
         if abs(start_pos.y - end_pos.y) == 2 and abs(end_pos.x - start_pos.x) == 2:
-            between_pos = board[(start_pos.x + end_pos.x)//2][(start_pos.y + end_pos.y)//2]
+            between_pos = current_board[(start_pos.x + end_pos.x)//2][(start_pos.y + end_pos.y)//2]
             if between_pos.piece is not None:
                 if between_pos.piece.black != start_pos.piece.black:
                     return True, True
     return False, False
 
 
+def evaluate_board(current_board):
+    score = 0
+    for sq in chain.from_iterable(current_board):
+        if sq.piece is not None:
+            if sq.piece.black == black_maximizing:
+                if sq.piece.king:
+                    score += 2
+                else:
+                    score += 1
+            else:
+                if sq.piece.king:
+                    score -= 2
+                else:
+                    score -= 1
+    return score
+
+def minmax(board_this_turn, blacks_turn, depth):
+    if depth >= max_minmax_depth or check_if_end(board_this_turn) is not None:
+        return None, None, evaluate_board(board_this_turn)
+    else:
+        possible_moves = []
+        for start_pos in chain.from_iterable(board_this_turn):
+            if start_pos.piece is not None:
+                if start_pos.piece.black == blacks_turn:
+                    possible_moves.append([start_pos, return_legal_moves(board_this_turn, start_pos)])
+        print("{} possible moves in depth {}".format(len(possible_moves), depth))
+        scores = []
+        for start_pos, legal_moves in possible_moves:
+            print("legal moves for {} are {}".format(start_pos, legal_moves))
+            for end_pos in legal_moves:
+                board_next_turn = deepcopy(board_this_turn)
+                n_turn = move_piece(board_next_turn, start_pos, end_pos)
+                next_turn = not blacks_turn if n_turn else blacks_turn
+                check_if_king(board_next_turn)
+                scores.append([start_pos, end_pos, minmax(board_next_turn, next_turn, depth+1)[2]])
+                print(scores)
+        if blacks_turn == black_maximizing:
+            return max(scores, key=lambda s: s[2])
+        else:
+            return min(scores, key=lambda s: s[2])
+
+max_minmax_depth = 1
 init()
 black_turn = True
 run = True
-winner = None
+black_won = None
+black_maximizing = True
 while run:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.MOUSEBUTTONDOWN and black_turn:
             mouse_pos = pygame.mouse.get_pos()
             select_sq(*mouse_pos, black_turn)
 
-    check_if_must_capture()
-    check_if_king()
-    check_if_end()
+    highlight_must_capture(board)
+    check_if_king(board)
+    black_won = check_if_end(board)
+    draw()
+
+    if not black_turn and black_won is None:
+        board_this_turn = deepcopy(board)
+        start_pos, end_pos, score = minmax(board_this_turn, black_turn, depth=0)
+        print("score of this move is {}".format(score))
+        print("the move is {} to {}".format(board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y]))
+        n_turn = move_piece(board, board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y])
+        if n_turn:
+            black_turn = not black_turn
+
+    highlight_must_capture(board)
+    check_if_king(board)
+    black_won = check_if_end(board)
     draw()
 
 
