@@ -296,36 +296,36 @@ def minmax(board_this_turn, blacks_turn, depth, a, b):
                 # print("lets try {}".format(e_pos))
                 board_next_turn = deepcopy(board_this_turn)
                 n_turn = move_piece(board_next_turn, blacks_turn, board_next_turn[s_pos.x][s_pos.y], board_next_turn[e_pos.x][e_pos.y])
-                draw(board_next_turn, blacks_turn, depth)
+                # draw(board_next_turn, blacks_turn, depth)
                 # pygame.time.delay(200)
                 pygame.event.pump()
                 next_turn = not blacks_turn if n_turn else blacks_turn
-
-                print("IT IS TIME FOR NEXT TURN {} so now it is blacks turn {}".format(n_turn, next_turn))
+                # print("IT IS TIME FOR NEXT TURN {} so now it is blacks turn {}".format(n_turn, next_turn))
                 mark_must_capture(board_next_turn, next_turn)
                 check_if_king(board_next_turn)
                 score = [board_next_turn[s_pos.x][s_pos.y], board_next_turn[e_pos.x][e_pos.y], minmax(board_next_turn, next_turn, depth+1, a, b)[2]]
                 if blacks_turn == black_maximizing:
                     if score[2] > best_score[2]:
                         best_score = score
-                    a = max(score[2], a)
-                    if a <= b:
-                        print("PRUNING b")
-                        return best_score
+                        a = max(score[2], a)
+                        if best_score[2] > b or check_if_must_capture(board_this_turn, blacks_turn):
+                            print("PRUNING max")
+                            return best_score
+
                 else:
                     if score[2] < best_score[2]:
                         best_score = score
-                    b = min(score[2], b)
-                    if a >= b:
-                        print("PRUNING a")
-                        return best_score
+                        b = min(score[2], a)
+                        if best_score[2] < a or check_if_must_capture(board_this_turn, blacks_turn):
+                            print("PRUNING min")
+                            return best_score
 
         return best_score
 
 
-max_minmax_depth = 6
+max_minmax_depth = 4
 init()
-black_turn = False
+black_turn = True
 run = True
 black_won = None
 black_maximizing = True
