@@ -84,16 +84,16 @@ def init():
                 board[x][y].piece = Piece(True)
 
 
-def draw():
+def draw(board, blacks_turn, depth=0):
     win.fill((255, 255, 255))
     for sq in chain.from_iterable(board):
         sq.draw()
 
     if black_won is None:
-        if black_turn:
-            text = "it's blacks turn"
+        if blacks_turn:
+            text = "it's blacks turn   depth - {}".format(depth)
         else:
-            text = "it's whites turn"
+            text = "it's whites turn   depth - {}".format(depth)
     else:
         text = "{}'s the winner".format(black_won)
     rendered_text = standard_font.render(text, True, (0, 0, 0))
@@ -205,12 +205,12 @@ def move_piece(current_board, blacks_turn, start_pos, end_pos):
     capture = False if abs(start_pos.x - end_pos.x) == 1 else True
 
     if not capture:
-        print("move function will move {} to {}".format(start_pos, end_pos))
+        # print("move function will move {} to {}".format(start_pos, end_pos))
         end_pos.piece = start_pos.piece
         start_pos.piece = None
         n_turn = next_turn(current_board, blacks_turn, end_pos, False)
     else:
-        print("move function will capture moving {} to {}".format(start_pos, end_pos))
+        # print("move function will capture moving {} to {}".format(start_pos, end_pos))
         end_pos.piece = start_pos.piece
         start_pos.piece = None
         current_board[(start_pos.x + end_pos.x) // 2][(start_pos.y + end_pos.y) // 2].piece = None
@@ -223,7 +223,7 @@ def next_turn(current_board, blacks_turn, end_pos, capture):
     n_turn = False
     if not capture:
         n_turn = True
-    if capture:
+    else:
         mark_must_capture(current_board, blacks_turn)
         if not end_pos.piece.must_capture:
             n_turn = True
@@ -278,7 +278,7 @@ def deep_copy_board(board_this_turn):
     return board_next_turn
 
 
-def minmax(board_this_turn, blacks_turn, depth):
+def minmax(board_this_turn, blacks_turn, depth, a, b):
     if depth >= max_minmax_depth or check_if_end(board_this_turn) is not None:
         return None, None, evaluate_board(board_this_turn)
     else:
@@ -286,26 +286,46 @@ def minmax(board_this_turn, blacks_turn, depth):
         for start_pos in chain.from_iterable(board_this_turn):
             if start_pos.piece is not None:
                 possible_moves.append([start_pos, return_legal_moves(board_this_turn, blacks_turn, start_pos)])
-        scores = []
+        if blacks_turn == black_maximizing:
+            best_score = [None, None, -float("inf")]
+        else:
+            best_score = [None, None, float("inf")]
         for s_pos, legal_moves in possible_moves:
             print("legal moves for {} in depth {} are {}".format(s_pos, depth, legal_moves))
             for e_pos in legal_moves:
-                print("lets try {}".format(e_pos))
+                # print("lets try {}".format(e_pos))
                 board_next_turn = deepcopy(board_this_turn)
                 n_turn = move_piece(board_next_turn, blacks_turn, board_next_turn[s_pos.x][s_pos.y], board_next_turn[e_pos.x][e_pos.y])
+                draw(board_next_turn, blacks_turn, depth)
+                # pygame.time.delay(200)
+                pygame.event.pump()
                 next_turn = not blacks_turn if n_turn else blacks_turn
+
                 print("IT IS TIME FOR NEXT TURN {} so now it is blacks turn {}".format(n_turn, next_turn))
                 mark_must_capture(board_next_turn, next_turn)
                 check_if_king(board_next_turn)
-                scores.append([board_next_turn[s_pos.x][s_pos.y], board_next_turn[e_pos.x][e_pos.y], minmax(board_next_turn, next_turn, depth+1)[2]])
-        if blacks_turn == black_maximizing:
-            return max(scores, key=lambda s: s[2])
-        else:
-            return min(scores, key=lambda s: s[2])
+                score = [board_next_turn[s_pos.x][s_pos.y], board_next_turn[e_pos.x][e_pos.y], minmax(board_next_turn, next_turn, depth+1, a, b)[2]]
+                if blacks_turn == black_maximizing:
+                    if score[2] > best_score[2]:
+                        best_score = score
+                    a = max(score[2], a)
+                    if a <= b:
+                        print("PRUNING b")
+                        return best_score
+                else:
+                    if score[2] < best_score[2]:
+                        best_score = score
+                    b = min(score[2], b)
+                    if a >= b:
+                        print("PRUNING a")
+                        return best_score
 
-max_minmax_depth = 3
+        return best_score
+
+
+max_minmax_depth = 6
 init()
-black_turn = True
+black_turn = False
 run = True
 black_won = None
 black_maximizing = True
@@ -320,11 +340,11 @@ while run:
     mark_must_capture(board, black_turn)
     check_if_king(board)
     black_won = check_if_end(board)
-    draw()
+    draw(board, black_turn)
 
     if not black_turn and black_won is None:
         board_this_turn = deepcopy(board)
-        start_pos, end_pos, score = minmax(board_this_turn, black_turn, depth=0)
+        start_pos, end_pos, score = minmax(board_this_turn, black_turn, 0, -float("inf"), float("inf"))
         print("score of this move is {}".format(score))
         print("the move is {} to {}".format(board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y]))
         n_turn = move_piece(board, black_turn, board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y])
@@ -334,5 +354,5 @@ while run:
     mark_must_capture(board, black_turn)
     check_if_king(board)
     black_won = check_if_end(board)
-    draw()
+    draw(board, black_turn)
 
