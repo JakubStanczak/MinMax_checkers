@@ -91,9 +91,9 @@ def draw(board, blacks_turn, depth=0):
 
     if black_won is None:
         if blacks_turn:
-            text = "it's blacks turn   depth - {}".format(depth)
+            text = "it's blacks turn".format(depth)
         else:
-            text = "it's whites turn   depth - {}".format(depth)
+            text = "it's whites turn".format(depth)
     else:
         text = "{}'s the winner".format(black_won)
     rendered_text = standard_font.render(text, True, (0, 0, 0))
