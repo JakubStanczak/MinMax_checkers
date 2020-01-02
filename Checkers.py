@@ -94,8 +94,10 @@ def draw(board, blacks_turn):
             text = "it's your turn".format(max_minmax_depth)
         else:
             text = "it's mine turn, i'm planing {} moves ahead now".format(max_minmax_depth)
+    elif black_won:
+        text = "You are the winner"
     else:
-        text = "{}'s the winner".format(black_won)
+        text = "You lost. Nothing can stop this AI now"
     rendered_text = standard_font.render(text, True, (0, 0, 0))
     win.blit(rendered_text, (2, 10))
     pygame.display.update()
@@ -351,11 +353,8 @@ while run:
     draw(board, black_turn)
 
     # setting max depth
-    pieces = how_many_left(board)
-    if pieces > 18:
-        max_minmax_depth = 3
-    else:
-        max_minmax_depth = 4
+    max_minmax_depth = 3 if how_many_left(board) > 20 else 4
+
 
     if not black_turn and black_won is None:
         board_this_turn = deepcopy(board)
