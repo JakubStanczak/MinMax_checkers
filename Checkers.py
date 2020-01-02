@@ -84,24 +84,24 @@ def init():
                 board[x][y].piece = Piece(True)
 
 
-def draw(board, blacks_turn, depth=0):
+def draw(board, blacks_turn):
     win.fill((255, 255, 255))
     for sq in chain.from_iterable(board):
         sq.draw()
 
     if black_won is None:
         if blacks_turn:
-            text = "it's blacks turn".format(depth)
+            text = "it's your turn".format(max_minmax_depth)
         else:
-            text = "it's whites turn".format(depth)
+            text = "it's mine turn, i'm planing {} moves ahead now".format(max_minmax_depth)
     else:
         text = "{}'s the winner".format(black_won)
     rendered_text = standard_font.render(text, True, (0, 0, 0))
-    win.blit(rendered_text, (20, 5))
+    win.blit(rendered_text, (2, 10))
     pygame.display.update()
 
 
-def select_sq(x, y, turn):
+def select_sq(x, y):
     n_turn = False
     global black_turn
     if y < offset:
@@ -267,6 +267,14 @@ def evaluate_board(current_board):
                     score -= 1
     return score
 
+def how_many_left(current_board):
+    num = 0
+    for sq in chain.from_iterable(current_board):
+        if sq.piece:
+            num += 1
+    return num
+
+
 
 def deep_copy_board(board_this_turn):
     board_next_turn = []
@@ -323,7 +331,7 @@ def minmax(board_this_turn, blacks_turn, depth, a, b):
         return best_score
 
 
-max_minmax_depth = 4
+max_minmax_depth = 3
 init()
 black_turn = True
 run = True
@@ -335,12 +343,19 @@ while run:
             run = False
         if event.type == pygame.MOUSEBUTTONDOWN: # and black_turn:
             mouse_pos = pygame.mouse.get_pos()
-            select_sq(*mouse_pos, black_turn)
+            select_sq(*mouse_pos)
 
     mark_must_capture(board, black_turn)
     check_if_king(board)
     black_won = check_if_end(board)
     draw(board, black_turn)
+
+    # setting max depth
+    pieces = how_many_left(board)
+    if pieces > 18:
+        max_minmax_depth = 3
+    else:
+        max_minmax_depth = 4
 
     if not black_turn and black_won is None:
         board_this_turn = deepcopy(board)
@@ -348,6 +363,7 @@ while run:
         print("score of this move is {}".format(score))
         print("the move is {} to {}".format(board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y]))
         n_turn = move_piece(board, black_turn, board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y])
+        pygame.time.delay(100)
         if n_turn:
             black_turn = not black_turn
 
