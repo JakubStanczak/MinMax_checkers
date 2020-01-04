@@ -77,8 +77,12 @@ def init():
 
         board[2][1].piece = Piece(False)
         board[4][1].piece = Piece(True)
+        board[3][1].selected = True
     else:
+        for sq in chain.from_iterable(board):
+            sq.piece = None
         legal_dir = {player_plays_black: 1, not player_plays_black: -1}
+        clean_sel_high()
         for x in range(8):
             for y in range(3):
                 if board[x][y].black:
@@ -92,19 +96,21 @@ def draw(board, blacks_turn):
     win.fill((255, 255, 255))
     for sq in chain.from_iterable(board):
         sq.draw()
-
-    if player_plays_black is None:
-        text = "Pic your color"
-    else:
-        if black_won is None:
-            if blacks_turn == player_plays_black:
-                text = "it's your turn".format(max_minmax_depth)
-            else:
-                text = "it's mine turn, i'm planing {} moves ahead now".format(max_minmax_depth)
-        elif black_won == player_plays_black:
-            text = "You are the winner"
+    if against_player:
+        if player_plays_black is None:
+            text = "Pic your color"
         else:
-            text = "You lost. Nothing can stop this AI now"
+            if black_won is None:
+                if blacks_turn == player_plays_black:
+                    text = "it's your turn".format(max_minmax_depth)
+                else:
+                    text = "it's mine turn, i'm planing {} moves ahead now".format(max_minmax_depth)
+            elif black_won == player_plays_black:
+                text = "You are the winner"
+            else:
+                text = "You lost. Nothing can stop this AI now"
+    else:
+        text = "Black {} White {}, score {}, turn num {}".format(max_dept_AI_when_fighting[0], max_dept_AI_when_fighting[1], str(fight_score), turn_num)
 
     rendered_text = standard_font.render(text, True, (0, 0, 0))
     win.blit(rendered_text, (2, 10))
@@ -112,12 +118,17 @@ def draw(board, blacks_turn):
 
 def select_color(x, y):
     global player_plays_black
+    global against_player
     if y < offset:
         return
     x = x // Square.dim
     y = y // Square.dim - offset // Square.dim
     if board[x][y].piece is not None:
         player_plays_black = board[x][y].piece.black
+        init()
+    elif board[x][y].selected:
+        player_plays_black = False
+        against_player = False
         init()
 
 def select_sq(x, y):
@@ -206,6 +217,12 @@ def check_if_end(current_board):
         return True
     if black_count == 0:
         return False
+    if turn_num > 100:
+        score = evaluate_board(current_board)
+        if score < 0:
+            return False
+        else:
+            return True
 
 
 def check_if_must_capture(current_board, blacks_turn):
@@ -294,7 +311,7 @@ def how_many_left(current_board):
     return num
 
 def minmax(board_this_turn, blacks_turn, depth, a, b):
-    if depth >= max_minmax_depth or check_if_end(board_this_turn) is not None:
+    if depth >= max_minmax_depth:
         return None, None, evaluate_board(board_this_turn)
     else:
         possible_moves = []
@@ -324,7 +341,7 @@ def minmax(board_this_turn, blacks_turn, depth, a, b):
                         best_score = score
                         a = max(score[2], a)
                         if best_score[2] > b or check_if_must_capture(board_this_turn, blacks_turn):
-                            print("PRUNING max")
+                            # print("PRUNING max")
                             return best_score
 
                 else:
@@ -332,12 +349,20 @@ def minmax(board_this_turn, blacks_turn, depth, a, b):
                         best_score = score
                         b = min(score[2], a)
                         if best_score[2] < a or check_if_must_capture(board_this_turn, blacks_turn):
-                            print("PRUNING min")
+                            # print("PRUNING min")
                             return best_score
 
         return best_score
 
-max_minmax_depth = 3
+
+# when AI against AI
+max_dept_AI_when_fighting = [2, 3]  # black, white
+num_of_fights = 20
+fight_score = [0, 0]  # black, white
+fight_num = 0
+turn_num = 0
+
+max_minmax_depth = 2
 player_plays_black = None
 init()
 black_turn = False
@@ -374,15 +399,28 @@ while run:
         black_won = check_if_end(board)
         draw(board, black_turn)
 
-        if black_turn != player_plays_black and black_won is None:
+        if (black_turn != player_plays_black or not against_player) and black_won is None:
+            if not against_player:
+                max_minmax_depth = max_dept_AI_when_fighting[0] if black_turn else max_dept_AI_when_fighting[1]
+                turn_num += 1
             board_this_turn = deepcopy(board)
             start_pos, end_pos, score = minmax(board_this_turn, black_turn, 0, -float("inf"), float("inf"))
             print("score of this move is {}".format(score))
+            print(start_pos)
+            print(end_pos)
             print("the move is {} to {}".format(board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y]))
             n_turn = move_piece(board, black_turn, board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y])
-            pygame.time.delay(200)
+            # pygame.time.delay(500)
             if n_turn:
                 black_turn = not black_turn
 
-
-# TODO make 2 AI play egainst each other
+    if not against_player and black_won is not None:
+        if black_won:
+            fight_score[0] += 1
+        else:
+            fight_score[1] += 1
+        if fight_num < num_of_fights:
+            fight_num += 1
+            turn_num = 0
+            black_won = None
+            init()
