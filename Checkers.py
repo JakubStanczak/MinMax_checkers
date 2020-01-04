@@ -5,8 +5,6 @@ from itertools import chain
 pygame.init()
 standard_font = pygame.font.SysFont("calibri", 20, bold=True)
 
-debug_mode = True
-
 class Square:
     dim = 50
     def __init__(self, x, y, black):
@@ -69,19 +67,25 @@ pygame.display.set_caption("Checkers by Kuba")
 
 board = []
 def init():
-    for x in range(board_width):
-        column = []
-        for y in range(board_height):
-            column.append(Square(x, y, True if (x + y) % 2 == 1 else False))
-        board.append(column)
+    global legal_dir
+    if player_plays_black is None:
+        for x in range(board_width):
+            column = []
+            for y in range(board_height):
+                column.append(Square(x, y, True if (x + y) % 2 == 1 else False))
+            board.append(column)
 
-    for x in range(8):
-        for y in range(3):
-            if board[x][y].black:
-                board[x][y].piece = Piece(False)
-        for y in range(5, 8):
-            if board[x][y].black:
-                board[x][y].piece = Piece(True)
+        board[2][1].piece = Piece(False)
+        board[4][1].piece = Piece(True)
+    else:
+        legal_dir = {player_plays_black: 1, not player_plays_black: -1}
+        for x in range(8):
+            for y in range(3):
+                if board[x][y].black:
+                    board[x][y].piece = Piece(not player_plays_black)
+            for y in range(5, 8):
+                if board[x][y].black:
+                    board[x][y].piece = Piece(player_plays_black)
 
 
 def draw(board, blacks_turn):
@@ -89,19 +93,32 @@ def draw(board, blacks_turn):
     for sq in chain.from_iterable(board):
         sq.draw()
 
-    if black_won is None:
-        if blacks_turn:
-            text = "it's your turn".format(max_minmax_depth)
-        else:
-            text = "it's mine turn, i'm planing {} moves ahead now".format(max_minmax_depth)
-    elif black_won:
-        text = "You are the winner"
+    if player_plays_black is None:
+        text = "Pic your color"
     else:
-        text = "You lost. Nothing can stop this AI now"
+        if black_won is None:
+            if blacks_turn == player_plays_black:
+                text = "it's your turn".format(max_minmax_depth)
+            else:
+                text = "it's mine turn, i'm planing {} moves ahead now".format(max_minmax_depth)
+        elif black_won == player_plays_black:
+            text = "You are the winner"
+        else:
+            text = "You lost. Nothing can stop this AI now"
+
     rendered_text = standard_font.render(text, True, (0, 0, 0))
     win.blit(rendered_text, (2, 10))
     pygame.display.update()
 
+def select_color(x, y):
+    global player_plays_black
+    if y < offset:
+        return
+    x = x // Square.dim
+    y = y // Square.dim - offset // Square.dim
+    if board[x][y].piece is not None:
+        player_plays_black = board[x][y].piece.black
+        init()
 
 def select_sq(x, y):
     n_turn = False
@@ -168,10 +185,10 @@ def return_legal_moves(current_board, blacks_turn, start_pos):
 def check_if_king(current_board):
     for x in range(board_width):
         if current_board[x][0].piece is not None:
-            if current_board[x][0].piece.black:
+            if current_board[x][0].piece.black == player_plays_black:
                 current_board[x][0].piece.king = True
         if current_board[x][board_height - 1].piece is not None:
-            if not current_board[x][board_height - 1].piece.black:
+            if current_board[x][board_height - 1].piece.black != player_plays_black:
                 current_board[x][board_height - 1].piece.king = True
 
 
@@ -231,7 +248,7 @@ def next_turn(current_board, blacks_turn, end_pos, capture):
             n_turn = True
     return n_turn
 
-legal_dir = {True: 1, False: -1}
+legal_dir = {}
 def if_move_legal(current_board, blacks_turn, start_pos, end_pos):  # returns ifLegal, ifCapture
     must_capture = check_if_must_capture(current_board, blacks_turn)
     if end_pos.piece is None and start_pos.piece is not None:
@@ -276,18 +293,6 @@ def how_many_left(current_board):
             num += 1
     return num
 
-
-
-def deep_copy_board(board_this_turn):
-    board_next_turn = []
-    for column in board_this_turn:
-        column_next = []
-        for sq in column:
-            column_next.append(deepcopy(sq))
-        board_next_turn.append(column_next)
-    return board_next_turn
-
-
 def minmax(board_this_turn, blacks_turn, depth, a, b):
     if depth >= max_minmax_depth or check_if_end(board_this_turn) is not None:
         return None, None, evaluate_board(board_this_turn)
@@ -301,7 +306,7 @@ def minmax(board_this_turn, blacks_turn, depth, a, b):
         else:
             best_score = [None, None, float("inf")]
         for s_pos, legal_moves in possible_moves:
-            print("legal moves for {} in depth {} are {}".format(s_pos, depth, legal_moves))
+            # print("legal moves for {} in depth {} are {}".format(s_pos, depth, legal_moves))
             for e_pos in legal_moves:
                 # print("lets try {}".format(e_pos))
                 board_next_turn = deepcopy(board_this_turn)
@@ -332,42 +337,52 @@ def minmax(board_this_turn, blacks_turn, depth, a, b):
 
         return best_score
 
-
 max_minmax_depth = 3
+player_plays_black = None
 init()
-black_turn = True
+black_turn = False
 run = True
 black_won = None
 black_maximizing = True
+against_player = True
 while run:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
-        if event.type == pygame.MOUSEBUTTONDOWN: # and black_turn:
+        if event.type == pygame.MOUSEBUTTONDOWN and against_player:  # and black_turn:
             mouse_pos = pygame.mouse.get_pos()
-            select_sq(*mouse_pos)
+            if player_plays_black == black_turn:
+                select_sq(*mouse_pos)
 
-    mark_must_capture(board, black_turn)
-    check_if_king(board)
-    black_won = check_if_end(board)
+                pieces_left = how_many_left(board)
+                if pieces_left > 20:
+                    max_minmax_depth = 2
+                elif pieces_left > 14:
+                    max_minmax_depth = 3
+                else:
+                    max_minmax_depth = 4
+                # max_minmax_depth = 2 if how_many_left(board) > 18 else 3
+
+            elif player_plays_black is None:
+                select_color(*mouse_pos)
+
     draw(board, black_turn)
 
-    # setting max depth
-    max_minmax_depth = 3 if how_many_left(board) > 20 else 4
+    if player_plays_black is not None:
+        mark_must_capture(board, black_turn)
+        check_if_king(board)
+        black_won = check_if_end(board)
+        draw(board, black_turn)
+
+        if black_turn != player_plays_black and black_won is None:
+            board_this_turn = deepcopy(board)
+            start_pos, end_pos, score = minmax(board_this_turn, black_turn, 0, -float("inf"), float("inf"))
+            print("score of this move is {}".format(score))
+            print("the move is {} to {}".format(board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y]))
+            n_turn = move_piece(board, black_turn, board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y])
+            pygame.time.delay(200)
+            if n_turn:
+                black_turn = not black_turn
 
 
-    if not black_turn and black_won is None:
-        board_this_turn = deepcopy(board)
-        start_pos, end_pos, score = minmax(board_this_turn, black_turn, 0, -float("inf"), float("inf"))
-        print("score of this move is {}".format(score))
-        print("the move is {} to {}".format(board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y]))
-        n_turn = move_piece(board, black_turn, board[start_pos.x][start_pos.y], board[end_pos.x][end_pos.y])
-        pygame.time.delay(100)
-        if n_turn:
-            black_turn = not black_turn
-
-    mark_must_capture(board, black_turn)
-    check_if_king(board)
-    black_won = check_if_end(board)
-    draw(board, black_turn)
-
+# TODO make 2 AI play egainst each other
